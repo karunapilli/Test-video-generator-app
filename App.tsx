@@ -102,6 +102,20 @@ const App: React.FC = () => {
     setIdeas(currentIdeas);
     setError(null);
 
+    const resetGeneratingState = () => {
+        setIdeas(prevIdeas => {
+            const newIdeas = [...(prevIdeas || [])];
+            if(newIdeas[ideaIndex]) {
+              newIdeas[ideaIndex] = { 
+                ...newIdeas[ideaIndex], 
+                isGeneratingVideo: false, 
+                videoGenerationProgress: undefined 
+              };
+            }
+            return newIdeas;
+        });
+    }
+
     try {
       let operation = await generateVideoFromScript(targetIdea, language);
 
@@ -120,11 +134,17 @@ const App: React.FC = () => {
         });
       }
 
-      // Fix: The response from a completed video operation contains the generated video URI.
-      const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!videoUri) {
-        throw new Error("Video generation finished, but no video URI was found.");
+      const generatedVideo = operation.response?.generatedVideos?.[0];
+
+      if (!generatedVideo?.video?.uri) {
+        console.error("Video generation finished without a valid video URI.", operation);
+        const failureReason = "the AI was unable to produce a video, possibly due to internal errors or content safety filters.";
+        setError(`Video generation failed for "${targetIdea.title}". Reason: ${failureReason} Please try a different script.`);
+        resetGeneratingState();
+        return;
       }
+
+      const videoUri = generatedVideo.video.uri;
 
       setIdeas(prevIdeas => {
           const newIdeas = [...(prevIdeas || [])];
@@ -151,18 +171,7 @@ const App: React.FC = () => {
       console.error(e);
       const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
       setError(`Failed to generate video for "${targetIdea.title}". ${errorMessage}`);
-      
-      setIdeas(prevIdeas => {
-          const newIdeas = [...(prevIdeas || [])];
-          if(newIdeas[ideaIndex]) {
-            newIdeas[ideaIndex] = { 
-              ...newIdeas[ideaIndex], 
-              isGeneratingVideo: false, 
-              videoGenerationProgress: undefined 
-            };
-          }
-          return newIdeas;
-      });
+      resetGeneratingState();
     }
   }, [ideas, videoGenerationMessages]);
 

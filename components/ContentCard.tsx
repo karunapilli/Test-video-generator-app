@@ -53,7 +53,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ idea, index, onGenerat
       {hasGeneratedContent ? (
           <div className="flex flex-col h-full">
             {idea.videoUrl ? (
-                <video src={idea.videoUrl} controls autoPlay className="w-full rounded-lg mb-4 aspect-video object-cover border border-gray-600 bg-black">
+                <video src={idea.videoUrl} controls playsInline className="w-full rounded-lg mb-4 aspect-video object-cover border border-gray-600 bg-black">
                     Your browser does not support the video tag.
                 </video>
             ) : (

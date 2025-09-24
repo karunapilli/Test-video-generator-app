@@ -196,7 +196,13 @@ export const generateVideoFromScript = async (idea: VideoIdea, language: string)
     return operation;
   } catch (error) {
     console.error("Error initiating video generation:", error);
-    throw new Error("Failed to start the video generation process.");
+    if (error && typeof error === 'object' && 'message' in error) {
+        const errorMessage = (error as Error).message.toLowerCase();
+        if (errorMessage.includes('quota') || errorMessage.includes('resource_exhausted') || errorMessage.includes('429')) {
+            throw new Error("API Limit Reached: You've exceeded your current usage quota. Please check your plan and billing details.");
+        }
+    }
+    throw new Error("Failed to start the video generation process. Please check the console for details.");
   }
 };
 
