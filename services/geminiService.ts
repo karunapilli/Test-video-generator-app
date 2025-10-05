@@ -83,13 +83,13 @@ const scriptSchema = {
     title: { type: Type.STRING, description: "The original video title." },
     script: {
       type: Type.ARRAY,
-      description: "A list of scenes for the video.",
+      description: "A list of scenes for the video. For this task, it must contain exactly one scene.",
       items: {
         type: Type.OBJECT,
         properties: {
-          scene: { type: Type.NUMBER, description: "Scene number, starting from 1." },
-          visualDescription: { type: Type.STRING, description: "A detailed description of the visuals for this scene. What should the viewer see?" },
-          voiceover: { type: Type.STRING, description: "The exact voiceover script for this scene. This should be written in a natural, conversational style, as it will be spoken by an AI voice." }
+          scene: { type: Type.NUMBER, description: "Scene number, which should always be 1." },
+          visualDescription: { type: Type.STRING, description: "A detailed description of the visuals for this single scene." },
+          voiceover: { type: Type.STRING, description: "The exact, concise voiceover or dialogue for this scene." }
         },
         required: ["scene", "visualDescription", "voiceover"]
       }
@@ -100,14 +100,23 @@ const scriptSchema = {
 
 export const generateVideoScript = async (idea: VideoIdea): Promise<GeneratedScript> => {
   const prompt = `
-    Based on the following YouTube video idea, generate a complete, detailed, scene-by-scene script.
-    
+    Your task is to create a script for a single, concise, and engaging video clip, approximately 8-10 seconds long.
+    The script must focus on a single situation or moment, not a full story.
+
+    Based on the video idea:
     Title: "${idea.title}"
     Hook: "${idea.hook}"
-    Target Audience: "${idea.targetAudience}"
-    Initial Outline: ${idea.scriptOutline.join(', ')}
 
-    Flesh this out into a full script. Make the voiceover engaging, conversational, and natural-sounding. The visual descriptions must be vivid and detailed. Ensure the script flows well and is designed for high audience retention. Return the original title in your response.
+    Generate a script that contains ONLY ONE SCENE. This scene should describe one of the following:
+    1. A character delivering a single, impactful line of dialogue.
+    2. A character performing a single, clear, and visually interesting action.
+    3. A very short voiceover (1-2 sentences) explaining a single, focused visual.
+
+    The goal is to create content that is focused and perfectly sized for an 8-10 second video.
+    - **Visual Description:** Must be vivid and clear for an animator, describing only what happens in this single scene.
+    - **Voiceover:** Must be extremely brief and directly related to the visual.
+
+    Return the original title in your response, and ensure the 'script' array in the JSON contains exactly one scene object.
   `;
 
   try {
@@ -115,7 +124,7 @@ export const generateVideoScript = async (idea: VideoIdea): Promise<GeneratedScr
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        systemInstruction: "You are a professional screenwriter and YouTube scriptwriter. Your task is to turn a video concept into a production-ready script. Follow the JSON schema precisely.",
+        systemInstruction: "You are a professional screenwriter specializing in creating ultra-short, viral video clips. Your task is to turn a video concept into a production-ready script for a single scene, lasting about 8-10 seconds. Follow the JSON schema precisely, ensuring the script array contains only one item.",
         responseMimeType: "application/json",
         responseSchema: scriptSchema,
         temperature: 0.7,
@@ -151,7 +160,7 @@ export const generateThumbnail = async (prompt: string): Promise<string> => {
 };
 
 // Fix: The video generation API returns a specific `GenerateVideosOperation` type, not a generic `Operation`.
-export const generateVideoFromScript = async (idea: VideoIdea, language: string): Promise<GenerateVideosOperation> => {
+export const generateVideoFromScript = async (idea: VideoIdea, language: string, avatar: string): Promise<GenerateVideosOperation> => {
   const fullScript = idea.generatedScript?.script
     .map(scene => `
       ---
@@ -161,28 +170,75 @@ export const generateVideoFromScript = async (idea: VideoIdea, language: string)
       ---
     `).join('') || '';
 
+  let avatarInstruction = '';
+  switch (avatar) {
+      case 'baby':
+          avatarInstruction = `
+      **Primary Character:** The narrator and on-screen character is an adorable, expressive, and hyper-realistic animated baby, modeled after a child with big, curious eyes and a happy smile.
+      **Voice:** Use a cute, AI-generated baby-like voice that is still clear and easy to understand in the specified language. The voice must match the script's content and be perfectly lip-synced.
+      **Animation:** The baby's animations should be lifelike and engaging, with natural expressions (giggles, wide eyes, etc.) and movements that fit the voiceover.
+    `;
+          break;
+      case 'nova':
+          avatarInstruction = `
+      **Primary Character:** The narrator and on-screen character is 'Nova', a professional and trustworthy news anchor in her early 30s.
+      **Appearance:** She should have a polished, professional look (e.g., a smart blazer), suitable for a major news network.
+      **Voice:** Use a clear, articulate, and authoritative female voice in the specified language. The tone should be confident and engaging.
+      **Animation:** Animations should be subtle and professional, with realistic facial expressions and hand gestures appropriate for a news broadcast.
+    `;
+          break;
+      case 'zen':
+          avatarInstruction = `
+      **Primary Character:** The narrator and on-screen character is 'Zen', a friendly and calm cartoon guide.
+      **Appearance:** A simple, 2D animated character with a warm and approachable design. Think modern educational cartoon style.
+      **Voice:** Use a gentle, soothing, and friendly male or female voice in the specified language.
+      **Animation:** Animation should be smooth and expressive in a 2D cartoon style, with clear gestures that help explain the concepts in the voiceover.
+    `;
+          break;
+      case 'anya':
+          avatarInstruction = `
+      **Primary Character:** The narrator and on-screen character is 'Dr. Anya', a brilliant and approachable scientist in her 40s.
+      **Appearance:** She should look like an expert in her field, perhaps in a lab coat or professional attire, with a realistic and detailed character model.
+      **Voice:** Use an intelligent, clear, and enthusiastic female voice in the specified language, conveying expertise without being condescending.
+      **Animation:** Animations should be realistic and expressive, showing passion for the subject. She should interact with virtual graphics or elements related to the script.
+    `;
+          break;
+      default:
+          avatarInstruction = `**Voice Only:** This video should primarily be a voiceover with animated visuals as described in the script. No specific on-screen narrator is required.`
+  }
+
   const prompt = `
-    You are an advanced AI video producer. Your task is to create a complete, high-fidelity, animated video with synchronized audio based *exactly* on the script provided.
+    **AI Director Final Execution Order**
 
-    **CRITICAL AUDIO REQUIREMENT:**
-    The final output video file MUST contain a high-quality audio track. This audio track must be an AI-generated voiceover of the provided script's "voiceover" text. The voice should be clear, natural, and match the specified language and tone. A silent video or a video without the voiceover is considered a complete failure. This is not optional.
+    **1. PRIMARY OBJECTIVE: Full Audio & Lip-Sync**
+       - **VOICEOVER:** Generate a complete, high-quality voiceover in **${language}**. The voice must match the **${avatar}** character profile.
+       - **DIALOGUE:** The voiceover must narrate the *entire* script's "Voiceover" text, from the first scene to the last.
+       - **LIP-SYNC:** The on-screen character's lip movements MUST be perfectly synchronized with the dialogue.
+       - **FAILURE CONDITION:** A video that is silent, has missing audio, or poor lip-sync is an IMMEDIATE failure.
 
-    **FIDELITY AND REALISM MANDATE:**
-    - **Lip-Sync:** For any character that speaks, their lip movements MUST be perfectly synchronized with the voiceover audio.
-    - **Expressions & Animation:** Characters must display realistic facial expressions and body language that match the dialogue and visual descriptions.
-    - **Style Reference:** The animation quality, especially for talking characters, should aspire to the level of realism and expression seen in this reference: https://youtube.com/shorts/55WImnhCC0k?si=CAVmMNbq2SLG-TGV.
+    **2. CHARACTER & AVATAR DIRECTIVE**
+       ${avatarInstruction}
 
-    **VIDEO SPECIFICATIONS:**
-    - **Title:** "${idea.title}"
-    - **Target Audience/Tone:** ${idea.targetAudience}
-    - **Language for Voiceover:** ${language}
-    - **Video Length:** The video must be long enough to cover the entire script at a natural speaking pace.
+    **3. CINEMATIC & VISUALS DIRECTIVE**
+       - **QUALITY:** Photorealistic, cinematic quality. Aim for the visual fidelity of an Unreal Engine 5 render.
+       - **LIGHTING:** Use dramatic, cinematic lighting with soft shadows and ray-traced reflections.
+       - **CAMERA:** Employ dynamic camera work (e.g., subtle pans, dolly shots, focus pulls) to create a professional feel.
+       - **RESOLUTION:** 1080p (1920x1080), 16:9 aspect ratio.
 
-    **--- SCRIPT START ---**
-    ${fullScript}
+    **4. DO NOT INCLUDE (Negative Prompt)**
+       - Muted/silent output.
+       - Robotic or unnatural character animation.
+       - Static, boring camera shots.
+       - Glitches, artifacts, or visual noise.
+       - Truncated or incomplete videos that do not cover the full script.
+
+    **5. SCRIPT FOR PRODUCTION (Scene by Scene)**
+       **Title:** "${idea.title}"
+
+       ${fullScript}
     **--- SCRIPT END ---**
 
-    Produce a final MP4 video file that integrates all these elements: visuals, animation, and the mandatory audio voiceover.
+    Execute this directive with precision. The final output must be a polished, professional video ready for publication that fully renders the entire script provided.
   `;
 
   try {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { VideoIdea } from '../types';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
@@ -8,7 +8,7 @@ interface ContentCardProps {
   idea: VideoIdea;
   index: number;
   onGenerateScript: () => void;
-  onGenerateVideo: (index: number, language: string) => void;
+  onGenerateVideo: (index: number, language: string, avatar: string) => void;
 }
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -18,9 +18,91 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
   </div>
 );
 
+const Dropdown: React.FC<{
+  label: string;
+  options: { id: string; name: string; emoji?: string }[];
+  selected: { id: string; name: string; emoji?: string };
+  onSelect: (option: { id: string; name: string; emoji?: string }) => void;
+}> = ({ label, options, selected, onSelect }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <label className="block text-xs font-medium text-gray-400 mb-1">{label}</label>
+      <button
+        type="button"
+        className="w-full bg-gray-700/50 border border-gray-600 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 text-sm"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="flex items-center">
+          {selected.emoji && <span className="mr-2">{selected.emoji}</span>}
+          <span className="block truncate text-white">{selected.name}</span>
+        </span>
+        <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+          <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="origin-top-right absolute right-0 bottom-full mb-2 w-full rounded-md shadow-lg bg-gray-800 border border-gray-600 ring-1 ring-black ring-opacity-5 z-10">
+          <div className="py-1">
+            {options.map(option => (
+              <a
+                href="#"
+                key={option.id}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onSelect(option);
+                  setIsOpen(false);
+                }}
+                className={`flex items-center px-4 py-2 text-sm transition-colors duration-150 ${selected.id === option.id ? 'font-semibold text-white bg-purple-600' : 'text-gray-200 hover:bg-purple-500/50 hover:text-white'}`}
+              >
+                {option.emoji && <span className="mr-2">{option.emoji}</span>}
+                {option.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 export const ContentCard: React.FC<ContentCardProps> = ({ idea, index, onGenerateScript, onGenerateVideo }) => {
   const [copied, setCopied] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
+  
+  const languages = [
+    { id: 'English', name: 'English' }, 
+    { id: 'Telugu', name: 'Telugu' },
+    { id: 'Spanish', name: 'Spanish' },
+    { id: 'Hindi', name: 'Hindi' },
+    { id: 'French', name: 'French' },
+    { id: 'German', name: 'German' }
+  ];
+
+  const avatars = [
+    { id: 'baby', name: 'Cute Baby', emoji: '👶' },
+    { id: 'nova', name: 'Nova (Pro)', emoji: '👩‍💼' },
+    { id: 'zen', name: 'Zen (Cartoon)', emoji: '🧘' },
+    { id: 'anya', name: 'Dr. Anya (Expert)', emoji: '👩‍🔬' }
+  ];
+  
+  const [selectedLanguage, setSelectedLanguage] = useState(languages[0]);
+  const [selectedAvatar, setSelectedAvatar] = useState(avatars[0]);
 
   const handleCopy = () => {
     if (!idea.generatedScript) return;
@@ -95,28 +177,32 @@ export const ContentCard: React.FC<ContentCardProps> = ({ idea, index, onGenerat
 
             {!idea.videoUrl && !idea.isGeneratingVideo && (
               <div className="mt-auto pt-6 border-t border-gray-700">
-                
-                  <>
-                      <h4 className="font-semibold text-green-300 text-center mb-3">Ready to Produce Video with Voiceover?</h4>
-                      <div className="flex items-center gap-3">
-                          <select
-                              value={selectedLanguage}
-                              onChange={(e) => setSelectedLanguage(e.target.value)}
-                              className="w-full bg-gray-900/70 border border-gray-600 rounded-lg py-2 px-3 focus:ring-1 focus:ring-green-500 focus:border-green-500 transition-all text-sm"
-                          >
-                              <option value="English">English</option>
-                              <option value="Telugu">Telugu</option>
-                          </select>
-                          <button
-                              onClick={() => onGenerateVideo(index, selectedLanguage)}
-                              className="flex-shrink-0 flex items-center justify-center gap-2 text-md font-semibold text-white bg-gradient-to-r from-green-600 to-cyan-600 rounded-lg py-2 px-4 hover:from-green-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500"
-                          >
-                              <FilmIcon className="w-5 h-5" />
-                              <span>Generate Video</span>
-                          </button>
-                      </div>
-                      <p className="text-xs text-center text-gray-500 mt-3">This will generate a complete video file with a high-quality AI audio voiceover and realistic, lip-synced animation. The process may take several minutes.</p>
-                  </>
+                  <h4 className="font-semibold text-green-300 text-center mb-3">Ready to Produce Video?</h4>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <Dropdown
+                        label="Language"
+                        options={languages}
+                        selected={selectedLanguage}
+                        onSelect={setSelectedLanguage}
+                    />
+                    <Dropdown
+                        label="Avatar"
+                        options={avatars}
+                        selected={selectedAvatar}
+                        onSelect={setSelectedAvatar}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => onGenerateVideo(index, selectedLanguage.id, selectedAvatar.id)}
+                    className="w-full flex items-center justify-center gap-2 text-md font-semibold text-white bg-gradient-to-r from-green-600 to-cyan-600 rounded-lg py-2.5 px-4 hover:from-green-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500"
+                  >
+                    <FilmIcon className="w-5 h-5" />
+                    <span>Generate Video</span>
+                  </button>
+
+                  <p className="text-xs text-center text-gray-500 mt-3">Select a language and avatar, then generate a complete 1080p HD video. The process may take several minutes.</p>
               </div>
             )}
 

@@ -89,7 +89,7 @@ const App: React.FC = () => {
     "Almost there, preparing for premiere...",
   ];
 
-  const handleGenerateVideo = useCallback(async (ideaIndex: number, language: string) => {
+  const handleGenerateVideo = useCallback(async (ideaIndex: number, language: string, avatar: string) => {
     let currentIdeas = [...(ideas || [])];
     const targetIdea = currentIdeas[ideaIndex];
     if (!targetIdea) return;
@@ -117,7 +117,7 @@ const App: React.FC = () => {
     }
 
     try {
-      let operation = await generateVideoFromScript(targetIdea, language);
+      let operation = await generateVideoFromScript(targetIdea, language, avatar);
 
       let messageIndex = 0;
       while (!operation.done) {
